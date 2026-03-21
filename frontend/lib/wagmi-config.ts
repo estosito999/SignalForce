@@ -1,4 +1,4 @@
-import { createConfig, http } from "wagmi";
+import { createConfig, fallback, http } from "wagmi";
 import { hardhat, sepolia } from "wagmi/chains";
 import { injected, metaMask } from "wagmi/connectors";
 
@@ -10,6 +10,10 @@ export const wagmiConfig = createConfig({
   connectors: [metaMask(), injected({ shimDisconnect: true })],
   transports: {
     [hardhat.id]: http(hardhatRpcUrl),
-    [sepolia.id]: http(sepoliaRpcUrl)
+    [sepolia.id]: fallback([
+      http(sepoliaRpcUrl, { timeout: 12_000 }),
+      http("https://ethereum-sepolia-rpc.publicnode.com", { timeout: 12_000 }),
+      http("https://sepolia.gateway.tenderly.co", { timeout: 12_000 })
+    ])
   }
 });

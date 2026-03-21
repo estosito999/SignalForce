@@ -27,9 +27,9 @@ class ThesisCreate(BaseModel):
     bias: Bias
 
     price_volatility: float = Field(..., ge=0, le=100)
-    context_climate: float = Field(..., ge=0, le=100)
+    context_climate: float = Field(default=50, ge=0, le=100)
     expected_demand: float = Field(..., ge=0, le=100)
-    author_confidence: float = Field(..., ge=0, le=100)
+    author_confidence: float = Field(default=50, ge=0, le=100)
 
     summary: str = Field(..., min_length=10, max_length=280)
     thesis_text: str = Field(..., min_length=20, max_length=5000)
@@ -37,8 +37,8 @@ class ThesisCreate(BaseModel):
     is_premium: bool = False
     premium_price_wei: str = Field(default="0", pattern=r"^[0-9]+$")
 
-    evaluation_deadline: datetime
-    reference_price: float = Field(..., gt=0)
+    evaluation_deadline: datetime | None = None
+    reference_price: float = Field(default=1, gt=0)
     invalidation_condition: str | None = Field(default=None, max_length=280)
 
 

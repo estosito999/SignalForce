@@ -77,8 +77,8 @@ class FuzzyRiskEngine:
     def evaluate(
         self,
         price_volatility: float,
-        context_climate: float,
         expected_demand: float,
+        context_climate: float = 50.0,
         author_confidence: float = 50.0,
     ) -> FuzzyEvaluationResult:
         simulation = ctrl.ControlSystemSimulation(self.control_system)

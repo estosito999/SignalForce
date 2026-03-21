@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import timedelta
 from uuid import uuid4
 
 from sqlalchemy import func, select
@@ -28,11 +29,16 @@ class ThesisService:
         author_wallet = normalize_wallet(payload.author_wallet)
         ProfileService(self.db).get_or_create_profile(author_wallet)
 
+        context_climate = payload.context_climate
+        author_confidence = payload.author_confidence
+        evaluation_deadline = payload.evaluation_deadline or (datetime.utcnow() + timedelta(days=7))
+        reference_price = payload.reference_price
+
         fuzzy_result = fuzzy_risk_engine.evaluate(
             price_volatility=payload.price_volatility,
-            context_climate=payload.context_climate,
             expected_demand=payload.expected_demand,
-            author_confidence=payload.author_confidence,
+            context_climate=context_climate,
+            author_confidence=author_confidence,
         )
 
         public_id = str(uuid4())
@@ -44,9 +50,9 @@ class ThesisService:
                 "horizon": payload.horizon,
                 "bias": payload.bias.value,
                 "price_volatility": payload.price_volatility,
-                "context_climate": payload.context_climate,
+                "context_climate": context_climate,
                 "expected_demand": payload.expected_demand,
-                "author_confidence": payload.author_confidence,
+                "author_confidence": author_confidence,
                 "risk_score": fuzzy_result.risk_score,
                 "risk_level": fuzzy_result.risk_level.value,
                 "summary": payload.summary,
@@ -54,8 +60,8 @@ class ThesisService:
                 "premium_text": payload.premium_text,
                 "is_premium": payload.is_premium,
                 "premium_price_wei": payload.premium_price_wei,
-                "evaluation_deadline": payload.evaluation_deadline,
-                "reference_price": payload.reference_price,
+                "evaluation_deadline": evaluation_deadline,
+                "reference_price": reference_price,
                 "invalidation_condition": payload.invalidation_condition,
             }
         )
@@ -67,9 +73,9 @@ class ThesisService:
             horizon=payload.horizon,
             bias=payload.bias.value,
             price_volatility=payload.price_volatility,
-            context_climate=payload.context_climate,
+            context_climate=context_climate,
             expected_demand=payload.expected_demand,
-            author_confidence=payload.author_confidence,
+            author_confidence=author_confidence,
             risk_score=fuzzy_result.risk_score,
             risk_level=fuzzy_result.risk_level.value,
             summary=payload.summary,
@@ -77,8 +83,8 @@ class ThesisService:
             premium_text=payload.premium_text,
             is_premium=payload.is_premium,
             premium_price_wei=payload.premium_price_wei,
-            evaluation_deadline=payload.evaluation_deadline,
-            reference_price=payload.reference_price,
+            evaluation_deadline=evaluation_deadline,
+            reference_price=reference_price,
             invalidation_condition=payload.invalidation_condition,
             post_hash=post_hash,
             status="pending_onchain",

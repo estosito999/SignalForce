@@ -12,33 +12,18 @@ export interface RiskFormValues {
   horizon: string;
   bias: "bullish" | "bearish" | "neutral";
   priceVolatility: number;
-  contextClimate: number;
   expectedDemand: number;
-  authorConfidence: number;
   summary: string;
   thesisText: string;
   premiumText: string;
   isPremium: boolean;
   premiumPriceWei: string;
-  evaluationDeadline: string;
-  referencePrice: number;
   invalidationCondition: string;
 }
 
 interface RiskFormProps {
   isLoading: boolean;
   onSubmit: (values: RiskFormValues) => Promise<void>;
-}
-
-function defaultDeadline() {
-  const date = new Date();
-  date.setDate(date.getDate() + 7);
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const hours = `${date.getHours()}`.padStart(2, "0");
-  const minutes = `${date.getMinutes()}`.padStart(2, "0");
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 function SliderRow({
@@ -78,17 +63,13 @@ export function RiskForm({ isLoading, onSubmit }: RiskFormProps) {
       horizon: "7d",
       bias: "bullish",
       priceVolatility: 50,
-      contextClimate: 50,
       expectedDemand: 50,
-      authorConfidence: 50,
       summary: "Tesis de ejemplo para publicar en SignalForce.",
       thesisText:
         "Desarrollo de tesis: momentum, zonas de liquidez, invalidacion y escenario base para el horizonte elegido.",
       premiumText: "Escenarios extendidos con niveles adicionales y gestion avanzada de riesgo.",
       isPremium: false,
       premiumPriceWei: "1000000000000000",
-      evaluationDeadline: defaultDeadline(),
-      referencePrice: 100,
       invalidationCondition: "Cierre diario por debajo del soporte principal"
     }),
     []
@@ -145,22 +126,10 @@ export function RiskForm({ isLoading, onSubmit }: RiskFormProps) {
             onChange={(value) => setValues((prev) => ({ ...prev, priceVolatility: value }))}
           />
           <SliderRow
-            label="Contexto / clima"
-            hint="0 = favorable, 100 = adverso"
-            value={values.contextClimate}
-            onChange={(value) => setValues((prev) => ({ ...prev, contextClimate: value }))}
-          />
-          <SliderRow
             label="Demanda esperada"
             hint="0 = debil, 100 = muy fuerte"
             value={values.expectedDemand}
             onChange={(value) => setValues((prev) => ({ ...prev, expectedDemand: value }))}
-          />
-          <SliderRow
-            label="Confianza del autor"
-            hint="0 = baja, 100 = muy alta"
-            value={values.authorConfidence}
-            onChange={(value) => setValues((prev) => ({ ...prev, authorConfidence: value }))}
           />
 
           <div className="space-y-2">
@@ -180,29 +149,6 @@ export function RiskForm({ isLoading, onSubmit }: RiskFormProps) {
               onChange={(e) => setValues((prev) => ({ ...prev, thesisText: e.target.value }))}
               className="min-h-28 w-full rounded-lg border border-input bg-background p-3 text-sm"
             />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="deadline">Fecha limite de evaluacion</Label>
-              <Input
-                id="deadline"
-                type="datetime-local"
-                value={values.evaluationDeadline}
-                onChange={(e) => setValues((prev) => ({ ...prev, evaluationDeadline: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="reference-price">Precio de referencia</Label>
-              <Input
-                id="reference-price"
-                type="number"
-                min={0}
-                step="0.01"
-                value={values.referencePrice}
-                onChange={(e) => setValues((prev) => ({ ...prev, referencePrice: Number(e.target.value) }))}
-              />
-            </div>
           </div>
 
           <div className="space-y-2">

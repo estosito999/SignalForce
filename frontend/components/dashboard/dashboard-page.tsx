@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, useChainId, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useChainId, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 
 import { HistoryTable } from "@/components/dashboard/history-table";
 import { RankBadge } from "@/components/dashboard/rank-badge";
@@ -16,7 +16,7 @@ import {
   signalForceChainId,
   signalForceLedgerAddress
 } from "@/lib/contracts/risk-ledger";
-import { extractWriteErrorMessage } from "@/lib/contracts/write-ledger";
+import { extractWriteErrorMessage, maybeEstimateBufferedGas } from "@/lib/contracts/write-ledger";
 
 import { WalletButton } from "../wallet/wallet-button";
 
@@ -38,6 +38,7 @@ export function DashboardPage() {
 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const publicClient = usePublicClient();
   const { writeContractAsync, isPending: writingTx } = useWriteContract();
   const { isLoading: confirmingTx, isSuccess: confirmedTx, error: receiptError } = useWaitForTransactionReceipt({
     hash: pendingTxHash
@@ -134,16 +135,12 @@ export function DashboardPage() {
         horizon: values.horizon,
         bias: values.bias,
         price_volatility: values.priceVolatility,
-        context_climate: values.contextClimate,
         expected_demand: values.expectedDemand,
-        author_confidence: values.authorConfidence,
         summary: values.summary,
         thesis_text: values.thesisText,
         premium_text: values.premiumText,
         is_premium: values.isPremium,
         premium_price_wei: values.isPremium ? values.premiumPriceWei : "0",
-        evaluation_deadline: new Date(values.evaluationDeadline).toISOString(),
-        reference_price: values.referencePrice,
         invalidation_condition: values.invalidationCondition
       });
 
@@ -187,12 +184,57 @@ export function DashboardPage() {
     }
 
     try {
+      let estimatedGas = 350000n;
+
+      if (publicClient) {
+        try {
+          const existingPostLogs = await publicClient.getLogs({
+            address: signalForceLedgerAddress,
+            event: signalForceLedgerAbi[0],
+            args: {
+              actionId: result.id,
+              author: address
+            },
+            fromBlock: "earliest",
+            toBlock: "latest"
+          });
+
+          if (existingPostLogs.length > 0) {
+            const existingTxHash = existingPostLogs[existingPostLogs.length - 1]?.transactionHash;
+            if (existingTxHash) {
+              const synced = await registerThesisOnchain(result.id, {
+                wallet_address: address,
+                tx_hash: existingTxHash,
+                chain_id: chainId
+              });
+
+              setResult(synced);
+              setChainSuccess(`La publicacion ya estaba anclada. Sincronizada con tx ${existingTxHash.slice(0, 10)}...`);
+              await refreshFeed();
+              return;
+            }
+          }
+
+          estimatedGas = await maybeEstimateBufferedGas({
+            publicClient,
+            abi: signalForceLedgerAbi,
+            address: signalForceLedgerAddress,
+            functionName: "recordPost",
+            args: [result.id, result.post_hash],
+            account: address
+          });
+        } catch {
+          estimatedGas = 350000n;
+        }
+      }
+
       const txHash = await writeContractAsync({
         abi: signalForceLedgerAbi,
         address: signalForceLedgerAddress,
         functionName: "recordPost",
         args: [result.id, result.post_hash],
-        account: address
+        account: address,
+        gas: estimatedGas
       });
 
       setPendingThesisId(result.id);
@@ -213,6 +255,13 @@ export function DashboardPage() {
 
       if (message.includes("EnforcedPause")) {
         setChainError("El contrato esta pausado y no acepta publicaciones temporalmente.");
+        return;
+      }
+
+      if (message.includes("execution reverted")) {
+        setChainError(
+          `El contrato rechazo la publicacion (revert). Verifica que ${signalForceLedgerAddress} sea SignalForceLedger en Sepolia.`
+        );
         return;
       }
 

@@ -1,6 +1,20 @@
 import { Address } from "viem";
 
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
+
 export const signalForceLedgerAbi = [
+  {
+    type: "event",
+    name: "ActionAnchored",
+    inputs: [
+      { indexed: true, name: "actionId", type: "string" },
+      { indexed: true, name: "parentId", type: "string" },
+      { indexed: true, name: "author", type: "address" },
+      { indexed: false, name: "contentHash", type: "bytes32" },
+      { indexed: false, name: "actionType", type: "uint8" },
+      { indexed: false, name: "timestamp", type: "uint256" }
+    ]
+  },
   {
     type: "function",
     name: "recordPost",
@@ -88,19 +102,32 @@ export const signalForceLedgerAbi = [
         ]
       }
     ]
+  },
+  {
+    type: "function",
+    name: "paused",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }]
+  },
+  {
+    type: "function",
+    name: "totalAnchors",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }]
   }
 ] as const;
 
 export const signalForceLedgerAddress =
   (process.env.NEXT_PUBLIC_SIGNAL_FORCE_CONTRACT_ADDRESS as Address | undefined) ||
-  (process.env.NEXT_PUBLIC_RISK_LEDGER_CONTRACT_ADDRESS as Address | undefined) ||
-  ("0x0000000000000000000000000000000000000000" as Address);
+  ("0xBc74F1f82C783847E68BF8F9476cD2222D8F8f28" as Address);
 
 const parsedChainId = Number(process.env.NEXT_PUBLIC_SIGNAL_FORCE_CHAIN_ID || "11155111");
 export const signalForceChainId = Number.isFinite(parsedChainId) ? parsedChainId : 11155111;
 
 export function hasValidContractAddress() {
-  return signalForceLedgerAddress !== "0x0000000000000000000000000000000000000000";
+  return signalForceLedgerAddress !== ZERO_ADDRESS;
 }
 
 export const riskLedgerAbi = signalForceLedgerAbi;

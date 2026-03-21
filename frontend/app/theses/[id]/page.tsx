@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { useAccount, useChainId, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useChainId, usePublicClient, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 
 import { CommentBox } from "@/components/dashboard/comment-box";
 import { PremiumLock } from "@/components/dashboard/premium-lock";
@@ -30,7 +30,7 @@ import {
   signalForceChainId,
   signalForceLedgerAddress
 } from "@/lib/contracts/risk-ledger";
-import { extractWriteErrorMessage } from "@/lib/contracts/write-ledger";
+import { extractWriteErrorMessage, maybeEstimateBufferedGas } from "@/lib/contracts/write-ledger";
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("es-ES", {
@@ -60,6 +60,7 @@ export default function ThesisDetailPage() {
 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const publicClient = usePublicClient();
   const { writeContractAsync, isPending: writingTx } = useWriteContract();
 
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
@@ -204,12 +205,24 @@ export default function ThesisDetailPage() {
     }
 
     try {
+      const estimatedGas = publicClient
+        ? await maybeEstimateBufferedGas({
+            publicClient,
+            abi: signalForceLedgerAbi,
+            address: signalForceLedgerAddress,
+            functionName: "recordComment",
+            args: [comment.id, thesisId, comment.comment_hash],
+            account: address
+          })
+        : 400000n;
+
       const txHash = await writeContractAsync({
         abi: signalForceLedgerAbi,
         address: signalForceLedgerAddress,
         functionName: "recordComment",
         args: [comment.id, thesisId, comment.comment_hash],
-        account: address
+        account: address,
+        gas: estimatedGas
       });
 
       setPendingAction({ type: "comment", id: comment.id });
@@ -287,13 +300,26 @@ export default function ThesisDetailPage() {
         amount_wei: amount
       });
 
+      const estimatedGas = publicClient
+        ? await maybeEstimateBufferedGas({
+            publicClient,
+            abi: signalForceLedgerAbi,
+            address: signalForceLedgerAddress,
+            functionName: "recordSubscription",
+            args: [thesis.author_wallet],
+            account: address,
+            value: BigInt(amount)
+          })
+        : 300000n;
+
       const txHash = await writeContractAsync({
         abi: signalForceLedgerAbi,
         address: signalForceLedgerAddress,
         functionName: "recordSubscription",
         args: [thesis.author_wallet],
         account: address,
-        value: BigInt(amount)
+        value: BigInt(amount),
+        gas: estimatedGas
       });
 
       setPendingAction({ type: "subscription", id: pendingSubscription.id });

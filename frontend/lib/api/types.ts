@@ -34,16 +34,16 @@ export interface ThesisCreateRequest {
   horizon: string;
   bias: Bias;
   price_volatility: number;
-  context_climate: number;
+  context_climate?: number;
   expected_demand: number;
-  author_confidence: number;
+  author_confidence?: number;
   summary: string;
   thesis_text: string;
   premium_text?: string;
   is_premium: boolean;
   premium_price_wei: string;
-  evaluation_deadline: string;
-  reference_price: number;
+  evaluation_deadline?: string;
+  reference_price?: number;
   invalidation_condition?: string;
 }
 
