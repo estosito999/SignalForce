@@ -1,0 +1,269 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAccount, useChainId, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+
+import { HistoryTable } from "@/components/dashboard/history-table";
+import { RankBadge } from "@/components/dashboard/rank-badge";
+import { ResultCard } from "@/components/dashboard/result-card";
+import { RiskForm, type RiskFormValues } from "@/components/dashboard/risk-form";
+import { Badge } from "@/components/ui/badge";
+import { createThesis, listFeed, registerThesisOnchain, walletLogin } from "@/lib/api/client";
+import { ProfileResponse, ThesisResponse } from "@/lib/api/types";
+import {
+  hasValidContractAddress,
+  signalForceLedgerAbi,
+  signalForceLedgerAddress
+} from "@/lib/contracts/risk-ledger";
+
+import { WalletButton } from "../wallet/wallet-button";
+
+export function DashboardPage() {
+  const [feed, setFeed] = useState<ThesisResponse[]>([]);
+  const [result, setResult] = useState<ThesisResponse | null>(null);
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+
+  const [loadingCreate, setLoadingCreate] = useState(false);
+  const [loadingFeed, setLoadingFeed] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [feedError, setFeedError] = useState<string | null>(null);
+
+  const [chainError, setChainError] = useState<string | null>(null);
+  const [chainSuccess, setChainSuccess] = useState<string | null>(null);
+  const [pendingThesisId, setPendingThesisId] = useState<string | null>(null);
+  const [pendingTxHash, setPendingTxHash] = useState<`0x${string}` | undefined>();
+  const [syncingBackend, setSyncingBackend] = useState(false);
+
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { writeContractAsync, isPending: writingTx } = useWriteContract();
+  const { isLoading: confirmingTx, isSuccess: confirmedTx, error: receiptError } = useWaitForTransactionReceipt({
+    hash: pendingTxHash
+  });
+
+  const refreshFeed = useCallback(async () => {
+    setLoadingFeed(true);
+    setFeedError(null);
+    try {
+      const response = await listFeed({ viewerWallet: address, onlyFollowing: false });
+      setFeed(response.items);
+    } catch {
+      setFeedError("No se pudo cargar el feed.");
+    } finally {
+      setLoadingFeed(false);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    void refreshFeed();
+  }, [refreshFeed]);
+
+  useEffect(() => {
+    async function syncWalletProfile() {
+      if (!isConnected || !address) {
+        setProfile(null);
+        return;
+      }
+
+      try {
+        const response = await walletLogin({ wallet_address: address });
+        setProfile(response.profile);
+      } catch {
+        setProfile(null);
+      }
+    }
+
+    void syncWalletProfile();
+  }, [address, isConnected]);
+
+  useEffect(() => {
+    if (receiptError) {
+      setChainError(receiptError.message);
+    }
+  }, [receiptError]);
+
+  useEffect(() => {
+    async function syncOnchainResult() {
+      if (!confirmedTx || !pendingTxHash || !pendingThesisId || !address) {
+        return;
+      }
+
+      setSyncingBackend(true);
+      setChainError(null);
+
+      try {
+        const updated = await registerThesisOnchain(pendingThesisId, {
+          wallet_address: address,
+          tx_hash: pendingTxHash,
+          chain_id: chainId
+        });
+
+        setResult(updated);
+        setChainSuccess(`Publicacion anclada: ${pendingTxHash.slice(0, 10)}...`);
+        await refreshFeed();
+      } catch (syncError) {
+        const message = syncError instanceof Error ? syncError.message : "Fallo al sincronizar transaccion en backend.";
+        setChainError(message);
+      } finally {
+        setPendingTxHash(undefined);
+        setPendingThesisId(null);
+        setSyncingBackend(false);
+      }
+    }
+
+    void syncOnchainResult();
+  }, [address, chainId, confirmedTx, pendingThesisId, pendingTxHash, refreshFeed]);
+
+  async function handleCreate(values: RiskFormValues) {
+    setLoadingCreate(true);
+    setError(null);
+    setChainError(null);
+    setChainSuccess(null);
+    setResult(null);
+
+    try {
+      if (!address) {
+        throw new Error("Conecta tu wallet para crear tesis.");
+      }
+
+      const response = await createThesis({
+        author_wallet: address,
+        asset: values.asset,
+        horizon: values.horizon,
+        bias: values.bias,
+        price_volatility: values.priceVolatility,
+        context_climate: values.contextClimate,
+        expected_demand: values.expectedDemand,
+        author_confidence: values.authorConfidence,
+        summary: values.summary,
+        thesis_text: values.thesisText,
+        premium_text: values.premiumText,
+        is_premium: values.isPremium,
+        premium_price_wei: values.isPremium ? values.premiumPriceWei : "0",
+        evaluation_deadline: new Date(values.evaluationDeadline).toISOString(),
+        reference_price: values.referencePrice,
+        invalidation_condition: values.invalidationCondition
+      });
+
+      setResult(response);
+      await refreshFeed();
+    } catch (createError) {
+      const message = createError instanceof Error ? createError.message : "No se pudo crear la tesis.";
+      setError(message);
+    } finally {
+      setLoadingCreate(false);
+    }
+  }
+
+  async function handleRecordOnchain() {
+    setChainError(null);
+    setChainSuccess(null);
+
+    if (!result) {
+      setChainError("Primero debes crear una tesis.");
+      return;
+    }
+
+    if (!isConnected || !address) {
+      setChainError("Conecta tu wallet para registrar la publicacion en blockchain.");
+      return;
+    }
+
+    if (!hasValidContractAddress()) {
+      setChainError("Configura NEXT_PUBLIC_SIGNAL_FORCE_CONTRACT_ADDRESS con el contrato desplegado.");
+      return;
+    }
+
+    try {
+      const txHash = await writeContractAsync({
+        abi: signalForceLedgerAbi,
+        address: signalForceLedgerAddress,
+        functionName: "recordPost",
+        args: [result.id, result.post_hash]
+      });
+
+      setPendingThesisId(result.id);
+      setPendingTxHash(txHash);
+      setChainSuccess(`Transaccion enviada: ${txHash.slice(0, 10)}...`);
+    } catch (chainTxError) {
+      const message = chainTxError instanceof Error ? chainTxError.message : "No fue posible registrar en blockchain.";
+      setChainError(message);
+    }
+  }
+
+  const recordingOnchain = writingTx || confirmingTx || syncingBackend;
+  const canRecordOnchain = Boolean(result && isConnected) && !recordingOnchain;
+
+  const stats = useMemo(
+    () => ({
+      total: feed.length,
+      anchored: feed.filter((item) => item.tx_hash).length,
+      premium: feed.filter((item) => item.is_premium).length
+    }),
+    [feed]
+  );
+
+  return (
+    <main className="relative min-h-screen overflow-hidden pb-12">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_10%,rgba(14,116,144,0.18),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(245,158,11,0.15),transparent_30%)]" />
+
+      <div className="container space-y-6 py-8">
+        <header className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card/80 p-6 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
+          <div className="space-y-3">
+            <Badge variant="secondary">SignalForce · Social + On-chain</Badge>
+            <div>
+              <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground md:text-4xl">SignalForce</h1>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                Red social pseudonima de tesis y senales de mercado con trazabilidad en Sepolia.
+              </p>
+              {profile && (
+                <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>{profile.pseudonym}</span>
+                  <RankBadge rank={profile.rank} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <WalletButton />
+        </header>
+
+        <section className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-xl border border-border/70 bg-card/90 p-4">
+            <p className="text-xs uppercase text-muted-foreground">Tesis</p>
+            <p className="font-display text-3xl font-semibold">{stats.total}</p>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-card/90 p-4">
+            <p className="text-xs uppercase text-muted-foreground">Ancladas en blockchain</p>
+            <p className="font-display text-3xl font-semibold">{stats.anchored}</p>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-card/90 p-4">
+            <p className="text-xs uppercase text-muted-foreground">Tesis premium</p>
+            <p className="font-display text-3xl font-semibold">{stats.premium}</p>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <RiskForm isLoading={loadingCreate} onSubmit={handleCreate} />
+          <ResultCard
+            result={result}
+            loading={loadingCreate}
+            error={error}
+            chainError={chainError}
+            chainSuccess={chainSuccess}
+            canRecordOnchain={canRecordOnchain}
+            recordingOnchain={recordingOnchain}
+            onRecordOnchain={handleRecordOnchain}
+          />
+        </section>
+
+        <section className="rounded-xl border border-border/70 bg-card/90 p-4">
+          <p className="text-xs uppercase text-muted-foreground">Contrato</p>
+          <p className="truncate font-mono text-xs text-muted-foreground">{signalForceLedgerAddress}</p>
+        </section>
+
+        <HistoryTable items={feed} loading={loadingFeed} error={feedError} />
+      </div>
+    </main>
+  );
+}

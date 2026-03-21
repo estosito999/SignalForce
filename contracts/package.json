@@ -1,0 +1,25 @@
+{
+  "name": "signalforce-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "clean": "hardhat clean",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "deploy:localhost": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
+    "record:localhost": "hardhat run scripts/recordEvaluation.ts --network localhost --no-compile",
+    "record:post": "hardhat run scripts/recordPost.ts --network localhost --no-compile",
+    "record:comment": "hardhat run scripts/recordComment.ts --network localhost --no-compile",
+    "record:subscription": "hardhat run scripts/recordSubscription.ts --network localhost --no-compile"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.3.0",
+    "dotenv": "^16.6.1",
+    "hardhat": "^2.26.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}

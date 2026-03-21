@@ -1,0 +1,35 @@
+## Node / frontend
+node_modules/
+.next/
+out/
+frontend/.turbo/
+frontend/node_modules_bad2/
+
+## Python / backend
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.db
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+## Hardhat / contracts
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+
+## Environment
+.env
+.env.*.local
+frontend/.env.local
+backend/.env
+contracts/.env
+
+## Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
