@@ -27,8 +27,10 @@ import { CommentResponse, ProfileResponse, ThesisResponse } from "@/lib/api/type
 import {
   hasValidContractAddress,
   signalForceLedgerAbi,
+  signalForceChainId,
   signalForceLedgerAddress
 } from "@/lib/contracts/risk-ledger";
+import { extractWriteErrorMessage } from "@/lib/contracts/write-ledger";
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("es-ES", {
@@ -196,19 +198,25 @@ export default function ThesisDetailPage() {
       return;
     }
 
+    if (chainId !== signalForceChainId) {
+      setError(`Cambia de red en MetaMask. Red actual: ${chainId}. Red esperada: ${signalForceChainId}.`);
+      return;
+    }
+
     try {
       const txHash = await writeContractAsync({
         abi: signalForceLedgerAbi,
         address: signalForceLedgerAddress,
         functionName: "recordComment",
-        args: [comment.id, thesisId, comment.comment_hash]
+        args: [comment.id, thesisId, comment.comment_hash],
+        account: address
       });
 
       setPendingAction({ type: "comment", id: comment.id });
       setPendingTxHash(txHash);
       setActionMessage(`Transaccion enviada: ${txHash.slice(0, 10)}...`);
     } catch (anchorError) {
-      const message = anchorError instanceof Error ? anchorError.message : "No se pudo anclar el comentario.";
+      const message = extractWriteErrorMessage(anchorError, "No se pudo anclar el comentario.");
       setError(message);
     }
   }
@@ -265,6 +273,11 @@ export default function ThesisDetailPage() {
       return;
     }
 
+    if (chainId !== signalForceChainId) {
+      setError(`Cambia de red en MetaMask. Red actual: ${chainId}. Red esperada: ${signalForceChainId}.`);
+      return;
+    }
+
     try {
       const amount = thesis.premium_price_wei && thesis.premium_price_wei !== "0" ? thesis.premium_price_wei : "1000000000000000";
 
@@ -279,6 +292,7 @@ export default function ThesisDetailPage() {
         address: signalForceLedgerAddress,
         functionName: "recordSubscription",
         args: [thesis.author_wallet],
+        account: address,
         value: BigInt(amount)
       });
 
@@ -286,7 +300,7 @@ export default function ThesisDetailPage() {
       setPendingTxHash(txHash);
       setActionMessage(`Suscripcion enviada: ${txHash.slice(0, 10)}...`);
     } catch (subscriptionError) {
-      const message = subscriptionError instanceof Error ? subscriptionError.message : "No se pudo completar la suscripcion.";
+      const message = extractWriteErrorMessage(subscriptionError, "No se pudo completar la suscripcion.");
       setError(message);
     }
   }

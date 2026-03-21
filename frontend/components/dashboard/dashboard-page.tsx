@@ -13,8 +13,10 @@ import { ProfileResponse, ThesisResponse } from "@/lib/api/types";
 import {
   hasValidContractAddress,
   signalForceLedgerAbi,
+  signalForceChainId,
   signalForceLedgerAddress
 } from "@/lib/contracts/risk-ledger";
+import { extractWriteErrorMessage } from "@/lib/contracts/write-ledger";
 
 import { WalletButton } from "../wallet/wallet-button";
 
@@ -164,6 +166,11 @@ export function DashboardPage() {
       return;
     }
 
+    if (result.tx_hash || result.onchain_recorded_at || result.status !== "pending_onchain") {
+      setChainSuccess("Esta publicacion ya fue anclada en blockchain.");
+      return;
+    }
+
     if (!isConnected || !address) {
       setChainError("Conecta tu wallet para registrar la publicacion en blockchain.");
       return;
@@ -174,25 +181,48 @@ export function DashboardPage() {
       return;
     }
 
+    if (chainId !== signalForceChainId) {
+      setChainError(`Cambia de red en MetaMask. Red actual: ${chainId}. Red esperada: ${signalForceChainId}.`);
+      return;
+    }
+
     try {
       const txHash = await writeContractAsync({
         abi: signalForceLedgerAbi,
         address: signalForceLedgerAddress,
         functionName: "recordPost",
-        args: [result.id, result.post_hash]
+        args: [result.id, result.post_hash],
+        account: address
       });
 
       setPendingThesisId(result.id);
       setPendingTxHash(txHash);
       setChainSuccess(`Transaccion enviada: ${txHash.slice(0, 10)}...`);
     } catch (chainTxError) {
-      const message = chainTxError instanceof Error ? chainTxError.message : "No fue posible registrar en blockchain.";
+      const message = extractWriteErrorMessage(chainTxError, "No fue posible registrar en blockchain.");
+
+      if (message.includes("post already anchored")) {
+        setChainError("La publicacion ya estaba registrada on-chain. Refresca el feed para sincronizar estado.");
+        return;
+      }
+
+      if (message.includes("post id required") || message.includes("post hash required")) {
+        setChainError("La publicacion no tiene datos validos para anclaje (postId/postHash).");
+        return;
+      }
+
+      if (message.includes("EnforcedPause")) {
+        setChainError("El contrato esta pausado y no acepta publicaciones temporalmente.");
+        return;
+      }
+
       setChainError(message);
     }
   }
 
   const recordingOnchain = writingTx || confirmingTx || syncingBackend;
-  const canRecordOnchain = Boolean(result && isConnected) && !recordingOnchain;
+  const canRecordOnchain =
+    Boolean(result && isConnected && !result.tx_hash && result.status === "pending_onchain") && !recordingOnchain;
 
   const stats = useMemo(
     () => ({

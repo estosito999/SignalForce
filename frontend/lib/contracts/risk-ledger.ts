@@ -96,6 +96,9 @@ export const signalForceLedgerAddress =
   (process.env.NEXT_PUBLIC_RISK_LEDGER_CONTRACT_ADDRESS as Address | undefined) ||
   ("0x0000000000000000000000000000000000000000" as Address);
 
+const parsedChainId = Number(process.env.NEXT_PUBLIC_SIGNAL_FORCE_CHAIN_ID || "11155111");
+export const signalForceChainId = Number.isFinite(parsedChainId) ? parsedChainId : 11155111;
+
 export function hasValidContractAddress() {
   return signalForceLedgerAddress !== "0x0000000000000000000000000000000000000000";
 }
