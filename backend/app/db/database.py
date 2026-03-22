@@ -9,13 +9,23 @@ settings = get_settings()
 
 
 def normalize_database_url(url: str) -> str:
-    if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    normalized = url.strip().strip('"').strip("'")
 
-    if url.startswith("postgresql://") and "+psycopg" not in url and "+psycopg2" not in url:
-        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if not normalized:
+        raise RuntimeError("DATABASE_URL is empty")
 
-    return url
+    if normalized.startswith("${{") or normalized.startswith("${"):
+        raise RuntimeError(
+            f"DATABASE_URL was not resolved correctly in Railway: {normalized}"
+        )
+
+    if normalized.startswith("postgres://"):
+        return normalized.replace("postgres://", "postgresql+psycopg://", 1)
+
+    if normalized.startswith("postgresql://") and "+psycopg" not in normalized and "+psycopg2" not in normalized:
+        return normalized.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    return normalized
 
 
 database_url = normalize_database_url(settings.database_url)
