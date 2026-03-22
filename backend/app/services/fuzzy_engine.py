@@ -26,52 +26,43 @@ class FuzzyRiskEngine:
         self.control_system = ctrl.ControlSystem(self._build_rules())
 
     def _define_memberships(self) -> None:
-        self.volatility["low"] = fuzz.trimf(self.volatility.universe, [0, 0, 40])
-        self.volatility["medium"] = fuzz.trimf(self.volatility.universe, [20, 50, 80])
-        self.volatility["high"] = fuzz.trimf(self.volatility.universe, [60, 100, 100])
+        self.volatility["low"] = fuzz.trapmf(self.volatility.universe, [0, 0, 25, 45])
+        self.volatility["medium"] = fuzz.trimf(self.volatility.universe, [30, 50, 70])
+        self.volatility["high"] = fuzz.trapmf(self.volatility.universe, [55, 75, 100, 100])
 
-        self.climate["favorable"] = fuzz.trimf(self.climate.universe, [0, 0, 40])
-        self.climate["uncertain"] = fuzz.trimf(self.climate.universe, [20, 50, 80])
-        self.climate["adverse"] = fuzz.trimf(self.climate.universe, [60, 100, 100])
+        self.climate["favorable"] = fuzz.trapmf(self.climate.universe, [0, 0, 25, 45])
+        self.climate["uncertain"] = fuzz.trimf(self.climate.universe, [30, 50, 70])
+        self.climate["adverse"] = fuzz.trapmf(self.climate.universe, [55, 75, 100, 100])
 
-        self.demand["low"] = fuzz.trimf(self.demand.universe, [0, 0, 40])
-        self.demand["medium"] = fuzz.trimf(self.demand.universe, [20, 50, 80])
-        self.demand["high"] = fuzz.trimf(self.demand.universe, [60, 100, 100])
+        self.demand["low"] = fuzz.trapmf(self.demand.universe, [0, 0, 25, 45])
+        self.demand["medium"] = fuzz.trimf(self.demand.universe, [30, 50, 70])
+        self.demand["high"] = fuzz.trapmf(self.demand.universe, [55, 75, 100, 100])
 
-        self.confidence["low"] = fuzz.trimf(self.confidence.universe, [0, 0, 40])
-        self.confidence["medium"] = fuzz.trimf(self.confidence.universe, [20, 50, 80])
-        self.confidence["high"] = fuzz.trimf(self.confidence.universe, [60, 100, 100])
+        self.confidence["low"] = fuzz.trapmf(self.confidence.universe, [0, 0, 25, 45])
+        self.confidence["medium"] = fuzz.trimf(self.confidence.universe, [30, 50, 70])
+        self.confidence["high"] = fuzz.trapmf(self.confidence.universe, [55, 75, 100, 100])
 
-        self.risk["low"] = fuzz.trimf(self.risk.universe, [0, 0, 40])
-        self.risk["medium"] = fuzz.trimf(self.risk.universe, [25, 50, 75])
-        self.risk["high"] = fuzz.trimf(self.risk.universe, [60, 100, 100])
+        self.risk["low"] = fuzz.trapmf(self.risk.universe, [0, 0, 25, 45])
+        self.risk["medium"] = fuzz.trimf(self.risk.universe, [30, 50, 70])
+        self.risk["high"] = fuzz.trapmf(self.risk.universe, [55, 75, 100, 100])
 
     def _build_rules(self) -> list[ctrl.Rule]:
         return [
-            ctrl.Rule(self.volatility["high"] | self.climate["adverse"], self.risk["high"]),
-            ctrl.Rule(self.demand["low"] & self.volatility["medium"], self.risk["high"]),
-            ctrl.Rule(self.demand["low"] & self.climate["adverse"], self.risk["high"]),
+            # Matriz principal (sensibilidad fuerte a volatilidad y demanda)
+            ctrl.Rule(self.volatility["low"] & self.demand["high"], self.risk["low"]),
+            ctrl.Rule(self.volatility["low"] & self.demand["medium"], self.risk["low"]),
+            ctrl.Rule(self.volatility["low"] & self.demand["low"], self.risk["medium"]),
+            ctrl.Rule(self.volatility["medium"] & self.demand["high"], self.risk["low"]),
+            ctrl.Rule(self.volatility["medium"] & self.demand["medium"], self.risk["medium"]),
+            ctrl.Rule(self.volatility["medium"] & self.demand["low"], self.risk["high"]),
+            ctrl.Rule(self.volatility["high"] & self.demand["high"], self.risk["medium"]),
+            ctrl.Rule(self.volatility["high"] & self.demand["medium"], self.risk["high"]),
+            ctrl.Rule(self.volatility["high"] & self.demand["low"], self.risk["high"]),
+            # Ajustes secundarios (solo afectan en extremos)
+            ctrl.Rule(self.climate["adverse"] & self.demand["low"], self.risk["high"]),
+            ctrl.Rule(self.climate["favorable"] & self.demand["high"], self.risk["low"]),
             ctrl.Rule(self.confidence["low"] & self.volatility["high"], self.risk["high"]),
-            ctrl.Rule(self.confidence["low"] & self.climate["uncertain"], self.risk["high"]),
-            ctrl.Rule(
-                self.volatility["low"] & self.climate["favorable"] & self.demand["high"] & self.confidence["high"],
-                self.risk["low"],
-            ),
-            ctrl.Rule(
-                self.volatility["low"] & self.climate["favorable"] & self.demand["medium"] & self.confidence["high"],
-                self.risk["low"],
-            ),
-            ctrl.Rule(
-                self.volatility["low"] & self.climate["favorable"] & self.demand["low"] & self.confidence["high"],
-                self.risk["medium"],
-            ),
-            ctrl.Rule(self.volatility["medium"] & self.climate["uncertain"], self.risk["medium"]),
-            ctrl.Rule(self.volatility["medium"] & self.climate["favorable"] & self.demand["high"], self.risk["medium"]),
-            ctrl.Rule(self.volatility["low"] & self.climate["uncertain"] & self.demand["high"], self.risk["medium"]),
-            ctrl.Rule(
-                self.volatility["medium"] | self.demand["medium"] | self.climate["uncertain"] | self.confidence["medium"],
-                self.risk["medium"],
-            ),
+            ctrl.Rule(self.confidence["high"] & self.demand["high"], self.risk["low"]),
         ]
 
     def evaluate(

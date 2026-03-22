@@ -81,6 +81,7 @@ export interface ThesisResponse {
   comments_count: number;
   created_at: string;
   updated_at: string;
+  source?: "backend" | "onchain";
 }
 
 export interface ThesisOnchainUpdateRequest {

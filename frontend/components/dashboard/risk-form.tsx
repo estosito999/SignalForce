@@ -14,7 +14,6 @@ export interface RiskFormValues {
   priceVolatility: number;
   expectedDemand: number;
   summary: string;
-  thesisText: string;
   premiumText: string;
   isPremium: boolean;
   premiumPriceWei: string;
@@ -65,8 +64,6 @@ export function RiskForm({ isLoading, onSubmit }: RiskFormProps) {
       priceVolatility: 50,
       expectedDemand: 50,
       summary: "Tesis de ejemplo para publicar en SignalForce.",
-      thesisText:
-        "Desarrollo de tesis: momentum, zonas de liquidez, invalidacion y escenario base para el horizonte elegido.",
       premiumText: "Escenarios extendidos con niveles adicionales y gestion avanzada de riesgo.",
       isPremium: false,
       premiumPriceWei: "1000000000000000",
@@ -138,16 +135,6 @@ export function RiskForm({ isLoading, onSubmit }: RiskFormProps) {
               id="summary"
               value={values.summary}
               onChange={(e) => setValues((prev) => ({ ...prev, summary: e.target.value }))}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="thesis-text">Comentario humano</Label>
-            <textarea
-              id="thesis-text"
-              value={values.thesisText}
-              onChange={(e) => setValues((prev) => ({ ...prev, thesisText: e.target.value }))}
-              className="min-h-28 w-full rounded-lg border border-input bg-background p-3 text-sm"
             />
           </div>
 

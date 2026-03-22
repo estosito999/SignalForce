@@ -121,7 +121,7 @@ export const signalForceLedgerAbi = [
 
 export const signalForceLedgerAddress =
   (process.env.NEXT_PUBLIC_SIGNAL_FORCE_CONTRACT_ADDRESS as Address | undefined) ||
-  ("0xBc74F1f82C783847E68BF8F9476cD2222D8F8f28" as Address);
+  ZERO_ADDRESS;
 
 const parsedChainId = Number(process.env.NEXT_PUBLIC_SIGNAL_FORCE_CHAIN_ID || "11155111");
 export const signalForceChainId = Number.isFinite(parsedChainId) ? parsedChainId : 11155111;

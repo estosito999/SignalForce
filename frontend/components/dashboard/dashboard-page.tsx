@@ -16,6 +16,7 @@ import {
   signalForceChainId,
   signalForceLedgerAddress
 } from "@/lib/contracts/risk-ledger";
+import { listOnchainPosts } from "@/lib/contracts/feed-from-chain";
 import { extractWriteErrorMessage, maybeEstimateBufferedGas } from "@/lib/contracts/write-ledger";
 
 import { WalletButton } from "../wallet/wallet-button";
@@ -29,6 +30,7 @@ export function DashboardPage() {
   const [loadingFeed, setLoadingFeed] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedError, setFeedError] = useState<string | null>(null);
+  const [feedNotice, setFeedNotice] = useState<string | null>(null);
 
   const [chainError, setChainError] = useState<string | null>(null);
   const [chainSuccess, setChainSuccess] = useState<string | null>(null);
@@ -47,15 +49,31 @@ export function DashboardPage() {
   const refreshFeed = useCallback(async () => {
     setLoadingFeed(true);
     setFeedError(null);
+    setFeedNotice(null);
+
     try {
       const response = await listFeed({ viewerWallet: address, onlyFollowing: false });
-      setFeed(response.items);
+      setFeed(response.items.map((item) => ({ ...item, source: "backend" as const })));
     } catch {
-      setFeedError("No se pudo cargar el feed.");
+      if (publicClient && hasValidContractAddress()) {
+        try {
+          const onchainItems = await listOnchainPosts(publicClient);
+          if (onchainItems.length > 0) {
+            setFeed(onchainItems);
+            setFeedNotice("Mostrando historial on-chain (fallback), el backend no respondio.");
+            return;
+          }
+        } catch {
+          // no-op: fall through to error state
+        }
+      }
+
+      setFeed([]);
+      setFeedError("No se pudo cargar el feed desde backend ni desde blockchain.");
     } finally {
       setLoadingFeed(false);
     }
-  }, [address]);
+  }, [address, publicClient]);
 
   useEffect(() => {
     void refreshFeed();
@@ -137,7 +155,7 @@ export function DashboardPage() {
         price_volatility: values.priceVolatility,
         expected_demand: values.expectedDemand,
         summary: values.summary,
-        thesis_text: values.thesisText,
+        thesis_text: `Analisis inicial: ${values.summary}`,
         premium_text: values.premiumText,
         is_premium: values.isPremium,
         premium_price_wei: values.isPremium ? values.premiumPriceWei : "0",
@@ -341,7 +359,7 @@ export function DashboardPage() {
           <p className="truncate font-mono text-xs text-muted-foreground">{signalForceLedgerAddress}</p>
         </section>
 
-        <HistoryTable items={feed} loading={loadingFeed} error={feedError} />
+        <HistoryTable items={feed} loading={loadingFeed} error={feedError} notice={feedNotice} />
       </div>
     </main>
   );
