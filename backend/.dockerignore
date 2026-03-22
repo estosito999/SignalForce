@@ -1,0 +1,10 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.git
+.env
+backend_run.log
+backend_uvicorn.log
+fuzzy_risk_ledger.db
