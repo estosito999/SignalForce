@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     app_name: str = "SignalForce API"
     api_v1_prefix: str = "/api/v1"
     database_url: str = "sqlite:///./signalforce.db"
-    frontend_origin: str = "http://localhost:3000"
+    frontend_origin: str = "https://signalforce.vercel.app"
 
 
 @lru_cache
