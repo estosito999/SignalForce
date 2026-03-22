@@ -8,3 +8,4 @@ scipy==1.16.2
 packaging==25.0
 networkx==3.5
 scikit-fuzzy==0.5.0
+psycopg[binary]==3.2.9

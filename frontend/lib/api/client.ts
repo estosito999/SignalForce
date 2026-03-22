@@ -19,9 +19,15 @@ import {
   WalletLoginResponse
 } from "@/lib/api/types";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
-  (process.env.NODE_ENV === "development" ? "http://localhost:8000/api/v1" : "");
+const API_BASE_URL = (() => {
+  const cleaned = process.env.NEXT_PUBLIC_API_BASE_URL?.trim().replace(/\/+$/, "");
+
+  if (!cleaned) {
+    return process.env.NODE_ENV === "development" ? "http://localhost:8000/api/v1" : "";
+  }
+
+  return cleaned.endsWith("/api/v1") ? cleaned : `${cleaned}/api/v1`;
+})();
 
 async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
